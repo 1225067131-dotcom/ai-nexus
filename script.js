@@ -74,9 +74,11 @@ const elements = {
   excludeSimilar: document.getElementById("excludeSimilar"),
   requireAllSets: document.getElementById("requireAllSets"),
   pronounceable: document.getElementById("pronounceable"),
-  titleCase: document.getElementById("titleCase"),
-  languageSelect: document.getElementById("languageSelect")
+  titleCase: document.getElementById("titleCase")
 };
+
+const langButtons = document.querySelectorAll(".lang-btn");
+let currentLocale = "zh";
 
 const charsetMap = {
   upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -85,16 +87,26 @@ const charsetMap = {
   symbols: "!@#$%^&*()-_=+[]{};:,.<>/?"
 };
 
+function syncLangButtons(locale) {
+  langButtons.forEach((btn) => {
+    const isActive = btn.dataset.lang === locale;
+    btn.setAttribute("aria-pressed", isActive);
+    btn.classList.toggle("active", isActive);
+  });
+}
+
 function applyLocale(locale) {
   const dict = i18nDict[locale] ?? i18nDict.zh;
-  document.documentElement.lang = locale;
+  currentLocale = dict === i18nDict[locale] ? locale : "zh";
+  document.documentElement.lang = currentLocale;
+  syncLangButtons(currentLocale);
   document.querySelectorAll("[data-i18n]").forEach((node) => {
     const key = node.dataset.i18n;
     if (dict[key]) node.textContent = dict[key];
   });
   elements.passwordOutput.placeholder =
-    locale === "en" ? "Click generate" : "点击生成密码";
-  localStorage.setItem(langKey, locale);
+    currentLocale === "en" ? "Click generate" : "点击生成密码";
+  localStorage.setItem(langKey, currentLocale);
 }
 
 function filterSimilar(text) {
@@ -206,10 +218,9 @@ function getStrengthLabel(labelKey, locale) {
 }
 
 function updateStrength(password) {
-  const locale = elements.languageSelect.value;
   const { value, label } = evaluateStrength(password);
   elements.strengthBar.style.width = `${value * 100}%`;
-  elements.strengthLabel.textContent = getStrengthLabel(label, locale);
+  elements.strengthLabel.textContent = getStrengthLabel(label, currentLocale);
 }
 
 function updateHistory(newPassword) {
@@ -244,10 +255,9 @@ async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
     elements.copyBtn.textContent =
-      elements.languageSelect.value === "en" ? "Copied!" : "已复制";
+      currentLocale === "en" ? "Copied!" : "已复制";
     setTimeout(() => {
-      elements.copyBtn.textContent =
-        i18nDict[elements.languageSelect.value].copy;
+      elements.copyBtn.textContent = i18nDict[currentLocale].copy;
     }, 1500);
   } catch {
     alert("复制失败，请手动复制。");
@@ -280,15 +290,19 @@ function initEvents() {
     renderHistory();
   });
 
-  elements.languageSelect.addEventListener("change", (event) => {
-    applyLocale(event.target.value);
-    updateStrength(elements.passwordOutput.value);
+  langButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const selected = btn.dataset.lang;
+      if (selected && selected !== currentLocale) {
+        applyLocale(selected);
+        updateStrength(elements.passwordOutput.value);
+      }
+    });
   });
 }
 
 function init() {
   const savedLang = localStorage.getItem(langKey) || "zh";
-  elements.languageSelect.value = savedLang;
   applyLocale(savedLang);
   elements.lengthValue.textContent = elements.lengthRange.value;
   renderHistory();
